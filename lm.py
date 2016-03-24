@@ -616,7 +616,7 @@ class ListMovies():
             return
 
         for idx, movie in enumerate(movie_list):
-            key = idx+1
+            key = "top" + str(idx+1)
             imdb_id = movie.getID()
             if not( cache_path.has_key(key) and \
                     cache_path[key]['imdb_id'] == imdb_id ):
@@ -643,7 +643,7 @@ class ListMovies():
                 if last_imdb_id:
                     result = self.cache_imdb[imdb_id]
                     last_result = self.cache_imdb[last_imdb_id]
-                    print("%d: %s (was %s)" %
+                    print("%s: %s (was %s)" %
                             (key, result['m_title'], last_result['m_title']))
 
         self.save_cache()
@@ -1592,7 +1592,7 @@ if __name__ == "__main__":
         sys.exit()
 
     if options.top:
-        files = [ i for i in xrange(250, 0, -1) ]
+        files = [ "top" + str(i) for i in xrange(250, 0, -1) ]
     elif options.movielist:
             with open(args[0]) as f:
                 files = [ s.replace('\n', '') for s in f.readlines() ]
