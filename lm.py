@@ -38,6 +38,9 @@ import xmlrpclib
 from difflib import SequenceMatcher
 from unicodedata import normalize
 
+reload(sys)
+sys.setdefaultencoding('utf8')
+
 # windows terminal coloration
 from platform import system
 if system().lower()=="windows":
