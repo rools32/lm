@@ -258,6 +258,9 @@ def decode_filter_phrase( filter_phrase ):
     filter_types = {    'genre':'genre',
                      'director':'director',
                         'actor':'cast',
+                        'runtime':'runtime',
+                        'year':'year',
+                        'rating':'rating',
                          'size':'size',
                       'country':'countries',
                        'unsure':'unsure' }
@@ -1299,6 +1302,38 @@ class ListMovies():
                         raise FilterParsingError
                     files = [ f for f in files if \
                             sign*keys < sign*os.path.getsize(f)/(1020*1024) ]
+
+                elif filter_type in ['runtime', 'year', 'rating']:
+                    self.log.info("filtering by %s" % filter_type)
+
+                    if (len(keys)>1):
+                        raise FilterParsingError
+                    try:
+                        keys = list(keys)[0]
+
+                        if keys[0] in ['-','+']:
+                            sign = 1 if keys[0] == '+' else -1
+                            keys = keys[1:]
+                        else:
+                            sign = 1
+
+                        keys = float(keys)
+                        self.log.info("filtering key: %s%f" % \
+                                ( "> " if sign==1 else "< ", keys))
+                    except:
+                        raise FilterParsingError
+
+                    field = 'm_' + filter_type
+
+                    if filter_type == 'runtime':
+                        files = [ f for f in files if \
+                                sign*keys <= sign*float(\
+                                self.get_runtime(self.cache_hash[\
+                                self.cache_path[f]['hash']][field])) ]
+                    else:
+                        files = [ f for f in files if \
+                                sign*keys <= sign*float(self.cache_hash[\
+                                self.cache_path[f]['hash']][field]) ]
 
 
                 elif filter_type == 'unsure':
