@@ -167,6 +167,8 @@ def parse_arguments():
 
     parser.add_argument('--top', action="store_true",
             help="Use top250 instead of files")
+    parser.add_argument('--movielist', action="store_true",
+            help="Use titles from specified file instead of files")
     parser.add_argument('-a','--alphabetical',
             action="store_true",default=False,
             help="sort by alphabetical order of title instead of rating")
@@ -1591,6 +1593,9 @@ if __name__ == "__main__":
 
     if options.top:
         files = [ i for i in xrange(250, 0, -1) ]
+    elif options.movielist:
+            with open(args[0]) as f:
+                files = [ s.replace('\n', '') for s in f.readlines() ]
     else:
         files = LM.get_files(args)
 
@@ -1600,6 +1605,8 @@ if __name__ == "__main__":
 
     if options.top:
         LM.update_caches_with_top( 250 )
+    elif options.movielist:
+        LM.update_caches_with_paths( files )
     else:
         LM.update_caches_with_paths( files )
         LM.update_cache_imdb_opensubtitles()
