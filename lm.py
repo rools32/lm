@@ -429,6 +429,7 @@ class ListMovies():
             'm_id'                : None,
             'm_title'             : None,
             'm_canonical_title'   : None,
+            'm_runtime'           : 0,
             'm_rating'            : None,
             'm_year'              : None,
             'm_genre'             : None,
@@ -908,6 +909,9 @@ class ListMovies():
 
         return {'g_title':title.strip(), 'g_year':guessed_year}
 
+    def get_runtime( self, runtime_list ):
+    # Extract the first runtime found from runtime_list
+        return runtime_list[0].split('::')[0].split(':')[-1]
 
 
     def __fill_metadata(self, cur_hash, found):
@@ -923,6 +927,7 @@ class ListMovies():
             current['m_id']    = found.movieID
             current['m_title'] = found.get('title')
             current['m_canonical_title']=found.get('smart canonical title')
+            current['m_runtime'] = found.get('runtime')
             current['m_rating'] = found.get('rating')
             current['m_year']   = found.get('year')
             current['m_genre']  = found.get('genre') or []
@@ -943,7 +948,7 @@ class ListMovies():
                     'm_genre':[],'m_countries':[],
                     'm_director':[], 'm_cast':[], 'm_cover':[],
                     'm_votes':0, 'm_summary':'.'*20,'m_rating':0,
-                    'm_year':1900,'m_short_summary':'.'*20})
+                    'm_runtime':[0],'m_year':1900,'m_short_summary':'.'*20})
 
 
     # ********** MANUAL CONFIRMATION *****************************************
@@ -1258,7 +1263,7 @@ class ListMovies():
                 filter_type = filt[1:end]
 
                 if not filter_type in ['genre','director','actor','size',
-                       'country','unsure']:
+                       'runtime', 'year', 'rating', 'country','unsure']:
                     raise FilterParsingError
 
                 if filter_type=="actor":
@@ -1367,6 +1372,7 @@ class ListMovies():
                                else self.YELLOW)+to_ascii(h['m_title'])+\
                                self.END,
                        'rating':str(h['m_rating']),
+                       'runtime':self.get_runtime(h['m_runtime']),
                        'year':h['m_year'],
                        'genre':"%s" % ', '.join(h['m_genre']),
                        'filename':os.path.basename(filename),
@@ -1378,6 +1384,7 @@ class ListMovies():
         if self.disp_very_long:
             out_str  =u"%(header)s%(title)s (%(b)srating%(e)s: %(rating)s)\n%"
             out_str +="(b)syear%(e)s: %(year)s %(b)sgenre%(e)s: %(genre)s\n%"
+            out_str +="(b)sruntime%(e)s: %(runtime)s min\n%"
             out_str +="(b)sfile%(e)s: %(filename)s %(b)ssize%(e)s: %(size)sMo"
             out_str +="\n%(b)sdirector%(e)s: %(director)s\n"
             out_str = out_str % values_dict
@@ -1395,12 +1402,12 @@ class ListMovies():
             out_str += "\n" + self.BLUE + "summary"+self.END+": %s\n---\n" % \
                     h['m_summary']
         elif self.disp_long:
-            out_str = u"%(header)s%(title)s (%(year)s,%(rating)s,%(size)sMo) "
+            out_str = u"%(header)s%(title)s (%(year)s, %(rating)s, %(runtime)smin) "
             out_str += "[%(b)s%(genre)s%(e)s] from %(director)s: "
             out_str += "%(filename)s\n"
             out_str = out_str % values_dict
         else:
-            out_str = u"%(header)s%(title)s (%(filename)s)\n" % values_dict
+            out_str = u"%(header)s%(title)s (%(year)s) - %(runtime)smin -> %(filename)s\n" % values_dict
         sys.stdout.write(out_str.encode('utf-8'))
         if self.disp_outline and h['m_short_summary']:
             sys.stdout.write(unicode( \
@@ -1409,13 +1416,13 @@ class ListMovies():
     def html_build(self, files):
     # Show the list of files, using metadata according to arguments
 
-        cell = u"<td width=200 height=250><a href=\"%(imdb)s\">\
-           %(title)s</a><br> \
+        cell = u"<td width=200 height=250>\
+           <a href='%(trailer)s'><img src='%(cover)s' height=150></a><br>\
+           <a href=\"%(imdb)s\">%(title)s</a> (%(year)s)<br> \
            <font color=%(color)s>%(genre)s<br>\
            note: %(rating)s, votes: %(votes)s<br>\
-           size: %(size)iMo</font><br>\
-           <a href='%(trailer)s'><img src='%(cover)s' height=150></a><br>\
-           <small>%(file)s</small></td>\n"
+           runtime: %(runtime)smin<br>\
+           size: %(size)iMo</font><br><br></td>"
 
         with codecs.open(self.html_fn,'w','utf-8') as out_file:
             out_file.write("<table>\n")
@@ -1435,6 +1442,7 @@ class ListMovies():
                         'title': h['m_title'],
                         'color': '#FF3333' if h['g_unsure'] else '#808080',
                         'rating' : str(h['m_rating']) or 'None',
+                        'runtime': self.get_runtime(h['m_runtime']),
                         'votes': str(round(h['m_votes']/1000,1))+'K' if \
                                 h['m_votes'] else 'None',
                         'cover': h['m_cover'],
