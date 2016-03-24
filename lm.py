@@ -1443,10 +1443,11 @@ class ListMovies():
                         'color': '#FF3333' if h['g_unsure'] else '#808080',
                         'rating' : str(h['m_rating']) or 'None',
                         'runtime': self.get_runtime(h['m_runtime']),
+                        'year':str(h['m_year']),
                         'votes': str(round(h['m_votes']/1000,1))+'K' if \
                                 h['m_votes'] else 'None',
                         'cover': h['m_cover'],
-                        'genre': ', '.join(h['m_genre'][0:2]),
+                        'genre': ', '.join(h['m_genre']),
                      'trailer':'http://www.youtube.com/results?search_query='+
                                 alphanum( h['m_title'],'+')+'+trailer'
                                 }
