@@ -165,6 +165,8 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser(description=ABOUT)
 
+    parser.add_argument('--top', action="store_true",
+            help="Use top250 instead of files")
     parser.add_argument('-a','--alphabetical',
             action="store_true",default=False,
             help="sort by alphabetical order of title instead of rating")
@@ -444,6 +446,7 @@ class ListMovies():
             'm_votes'             : None,
             'm_cover'             : None,
             'm_last_update'       : None,
+            't_imdb_id'           : None,
             'o_imdb_id'           : None,
             'o_year'              : None,
             'o_check'             : 0,
@@ -601,6 +604,53 @@ class ListMovies():
 
         self.save_cache()
 
+    def update_caches_with_top( self, num ):
+        cache_path = self.cache_path
+        cache_hash = self.cache_hash
+
+        try:
+            movie_list = self.i.get_top250_movies()[0:num]
+            if not movie_list:
+                self.log.warning("failed to get top250 from IMDB")
+                return
+        except imdb.IMDbError, e:
+            print( "Connexion error")
+            #print e
+            return
+
+        for idx, movie in enumerate(movie_list):
+            key = idx+1
+            cur_hash = movie.getID()
+            if not( cache_path.has_key(key) and \
+                    cache_path[key]['hash'] == cur_hash ):
+                last_hash=None
+
+                self.log.info("adding new top to cache: %s" % key)
+
+                if cache_path.has_key(key):
+                    last_hash = cache_path[key]['hash'];
+
+                cache_path[key] = store( self.default_path )
+                cache_path[key].update( {'hash':cur_hash } )
+
+                # setting default keys.values in cache
+                if not cache_hash.has_key(cur_hash):
+                    self.log.debug("adding hash entry %s for file: %s" % ( \
+                            str(cur_hash), key ) )
+
+                    cache_hash[cur_hash] = store( self.default_hash )
+                    cache_hash[cur_hash]['t_imdb_id'] = cur_hash
+
+                self.__get_metadata(cur_hash)
+
+                if last_hash:
+                    result = self.cache_hash[cur_hash]
+                    last_result = self.cache_hash[last_hash]
+                    print("%d: %s (was %s)" %
+                            (key, result['m_title'], last_result['m_title']))
+
+        self.save_cache()
+
     def update_cache_hash_opensubtitles(self):
     # Update cache_hash opensubtitles info
     # For movies which hash was not found in opensubtitles, will be tried
@@ -711,7 +761,8 @@ class ListMovies():
     # return a dictionary, 'path', 'cache_time', 'file_time'
 
         path = [ (k,v['last_update']) for k,v in self.cache_path.iteritems() \
-                if v['hash'] == cur_hash and os.path.exists(k) ]
+                if v['hash'] == cur_hash and not isinstance(k, (int, long)) \
+                and os.path.exists(k) ]
 
         if len(path)>0:
             update_time = [ k[1] for k in path ]
@@ -782,9 +833,18 @@ class ListMovies():
         try:
 
             # if we have an imdb_id from opensubtitles for this hash
+            top_imdb_id = cache_hash[cur_hash]['t_imdb_id']
             imdb_id = cache_hash[cur_hash]['o_imdb_id']
 
-            if imdb_id:
+            if top_imdb_id:
+                self.log.info("IMDb comes from top250 %s" % top_imdb_id)
+                result = self.i.get_movie(top_imdb_id)
+                if result:
+                    self.__fill_metadata( cur_hash, result )
+                else:
+                    self.log.warning("failed to get movie info from IMDB")
+
+            elif imdb_id:
                 self.log.info("IMDb id stored from Opensubtites %s" % imdb_id)
                 result = self.i.get_movie(imdb_id)
                 if result:
@@ -1410,7 +1470,8 @@ class ListMovies():
                        'runtime':self.get_runtime(h['m_runtime']),
                        'year':h['m_year'],
                        'genre':"%s" % ', '.join(h['m_genre']),
-                       'filename':os.path.basename(filename),
+                       'filename':os.path.basename(filename) if \
+                               not isinstance(filename , (int, long)) else filename,
                        'director':', '.join(h['m_director']),
                        'size': str(int(h['bytesize'] / (1024*1024))) \
                                if h['bytesize'] else None
@@ -1471,9 +1532,12 @@ class ListMovies():
                 if h['m_id']:
                     values_dict = {
                         'imdb' :'http://www.imdb.com/title/tt'+h['m_id'],
-                        'file' : os.path.basename(f)[0:20],
-                        'size' : round(h['bytesize']/(1024*1024),1)\
-                        if os.path.exists(f) else 0,
+                        'file' : os.path.basename(f)[0:20] if \
+                                not isinstance(f, (int, long)) else '',
+                        'size' : round(h['bytesize']/(1024*1024),1) if \
+                                not isinstance(f, (int, long)) \
+                                and os.path.exists(f) \
+                                else 0,
                         'title': h['m_title'],
                         'color': '#FF3333' if h['g_unsure'] else '#808080',
                         'rating' : str(h['m_rating']) or 'None',
@@ -1537,14 +1601,21 @@ if __name__ == "__main__":
         LM.reset_cache_files()
         sys.exit()
 
-    files = LM.get_files(args)
+    if options.top:
+        files = [ i for i in xrange(250, 0, -1) ]
+    else:
+        files = LM.get_files(args)
 
     if options.delete_cache:
         LM.delete_cache(files)
         sys.exit()
 
-    LM.update_caches_with_paths( files )
-    LM.update_cache_hash_opensubtitles()
+    if options.top:
+        LM.update_caches_with_top( 250 )
+    else:
+        LM.update_caches_with_paths( files )
+        LM.update_cache_hash_opensubtitles()
+
     LM.update_cache_hash_metadata()
     files = LM.filter_and_sort_files(files)
 
