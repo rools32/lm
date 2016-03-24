@@ -1595,7 +1595,8 @@ if __name__ == "__main__":
         files = [ "top" + str(i) for i in xrange(250, 0, -1) ]
     elif options.movielist:
             with open(args[0]) as f:
-                files = [ s.replace('\n', '') for s in f.readlines() ]
+                files = [ s.strip().replace('\n', '') for s in f.readlines() ]
+                files = filter(lambda x: len(x) and x[0] != "#", files)
     else:
         files = LM.get_files(args)
 
