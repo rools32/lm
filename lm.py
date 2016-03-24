@@ -1059,8 +1059,8 @@ class ListMovies():
                 if agree:
                     self.__fill_metadata(imdb, result)
                     self.cache_imdb[imdb].update(\
-                        { 'g_title':result['title'],
-                          'g_year':result['year'] })
+                        { 'm_title':result['title'],
+                          'm_year':result['year'] })
                     self.cache_path[f]['g_unsure'] = False
                     self.save_cache()
                     print("movie saved")
