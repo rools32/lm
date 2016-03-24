@@ -959,6 +959,8 @@ class ListMovies():
   
     def get_runtime( self, runtime_list ):
     # Extract the first runtime found from runtime_list
+        if runtime_list == None:
+            return -1
         return runtime_list[0].split('::')[0].split(':')[-1]
 
 
