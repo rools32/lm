@@ -388,13 +388,13 @@ class ListMovies():
             os.makedirs(cache_dir)
 
         self.cache_path_fn = os.path.join( cache_dir, 'cache_path')
-        self.cache_hash_fn = os.path.join( cache_dir, 'cache_hash')
+        self.cache_imdb_fn = os.path.join( cache_dir, 'cache_imdb')
 
         # html output sumup file
         self.html_fn  = os.path.join( cache_dir, 'html_sumup.html')
 
         self.load_cache_path()
-        self.load_cache_hash()
+        self.load_cache_imdb()
 
         self.i = imdb.IMDb()
 
@@ -428,10 +428,7 @@ class ListMovies():
         self.forbidden_words = ['divx','dvdrip','xvid','ts','dvdscr',
                      'cam','dvdscr','xvid','aac','r5']
 
-        self.default_hash = {
-            'bytesize'            : None,
-            'imdb_check'          : 0,
-            'm_id'                : None,
+        self.default_imdb = {
             'm_title'             : None,
             'm_canonical_title'   : None,
             'm_runtime'           : 0,
@@ -445,20 +442,22 @@ class ListMovies():
             'm_cast'              : None,
             'm_votes'             : None,
             'm_cover'             : None,
+            'imdb_id'             : None,
             'm_last_update'       : None,
-            't_imdb_id'           : None,
-            'o_imdb_id'           : None,
-            'o_year'              : None,
-            'o_check'             : 0,
-            'o_title'             : None,
-            'g_title'             : None,
-            'g_year'              : None,
-            'g_unsure'            : False
         }
 
         self.default_path = {
-            'hash'          : None,
-            'last_update'   : 0
+            'imdb_check'          : 0,
+            'imdb_id'       : None,
+            'file_hash'     : None,
+            'g_title'       : None,
+            'g_year'        : None,
+            'g_unsure'      : False,
+            'bytesize'      : None,
+            'last_update'   : 0,
+            'o_year'        : None,
+            'o_check'       : 0,
+            'o_title'       : None,
             }
 
     # ********** CACHE HANDLERS **********************************************
@@ -479,50 +478,51 @@ class ListMovies():
             cPickle.dump(self.cache_path,f)
         self.log.info("cache_path saved")
 
-    def load_cache_hash(self):
-        self.log.info("loading cache_hash")
+    def load_cache_imdb(self):
+        self.log.info("loading cache_imdb")
         try:
-            with open(self.cache_hash_fn,'r') as f:
-                self.cache_hash = cPickle.load(f)
-            self.log.info("cache_hash file loaded successfully")
+            with open(self.cache_imdb_fn,'r') as f:
+                self.cache_imdb = cPickle.load(f)
+            self.log.info("cache_imdb file loaded successfully")
         except:
-            self.log.debug("cache_hash not loaded ->  empty initilazation")
-            self.cache_hash = store()
-            self.cache_hash.static = False
+            self.log.debug("cache_imdb not loaded ->  empty initilazation")
+            self.cache_imdb = store()
+            self.cache_imdb.static = False
 
-    def _save_cache_hash(self):
-        self.log.info("saving cache_hash")
-        with open(self.cache_hash_fn,'w') as f:
-            cPickle.dump(self.cache_hash,f)
-        self.log.info("cache_hash saved")
+    def _save_cache_imdb(self):
+        self.log.info("saving cache_imdb")
+        with open(self.cache_imdb_fn,'w') as f:
+            cPickle.dump(self.cache_imdb,f)
+        self.log.info("cache_imdb saved")
 
     def _sync_cache(self):
     # delete self.cache_path items pointing whose hash isnt pointing
-    # to an self.cache_hash key
+    # to an self.cache_imdb key
         self.log.info("synchronizing caches")
         files = [ f for f, v in self.cache_path.iteritems() if \
-                    not self.cache_hash.has_key(v['hash']) ]
+                    not self.cache_imdb.has_key(v['imdb_id']) \
+                    ]
         for f in files:
             del self.cache_path[f]
 
     def save_cache(self):
     # save cache function
     # save both at same time, after 'consistency' check:
-    # every path from cache_path should point to an hash in cache_hash
+    # every path from cache_path should point to an hash in cache_imdb
 
         self.log.info("saving caches")
-        self._sync_cache()
+        # self._sync_cache() # TODO XXX
         self._save_cache_path()
-        self._save_cache_hash()
+        self._save_cache_imdb()
 
     def delete_cache( self, files ):
     # delete a list of files in cache
     # -> obviously deleted in cache_path
-    # -> but we delete also every hash (cache_hash)
+    # -> but we delete also every hash (cache_imdb)
     # not pointed by a file anymore
 
         cache_path = self.cache_path
-        cache_hash = self.cache_hash
+        cache_imdb = self.cache_imdb
 
         files = [ f for f in files if cache_path.has_key(f)]
         self.log.debug("%d entries to delete from cache_path" % len(files) )
@@ -535,9 +535,9 @@ class ListMovies():
 
             if confirm:
                 for f in files:
-                    cur_hash = cache_path[f]['hash']
-                    if cache_hash.has_key(cur_hash):
-                        del cache_hash[cur_hash]
+                    imdb_id = cache_path[f]['imdb_id']
+                    if cache_imdb.has_key(imdb_id):
+                        del cache_imdb[imdb_id]
                     del cache_path[f]
 
                 self.save_cache()
@@ -550,8 +550,8 @@ class ListMovies():
         if confirm:
             if os.path.exists(self.cache_path_fn):
                 os.remove(self.cache_path_fn)
-            if os.path.exists(self.cache_hash_fn):
-                os.remove(self.cache_hash_fn)
+            if os.path.exists(self.cache_imdb_fn):
+                os.remove(self.cache_imdb_fn)
             if os.path.exists(self.html_fn):
                 os.remove(self.html_fn)
 
@@ -561,15 +561,15 @@ class ListMovies():
         sys.stdout.flush()
 
     # ********** CACHE UPDATERS  *********************************************
-    # When you update caches (cache_path, and cache_hash) order matters
+    # When you update caches (cache_path, and cache_imdb) order matters
     #
     # A/ first get files to consider
     # then run:
     #   1/ update_caches_with_paths
-    #       this function will update cache_path and cache_hash keys
+    #       this function will update cache_path and cache_imdb keys
     #       and will set default keys/values
-    #   2/ update_cache_hash_opensubtitles, to search for known hash
-    #   3/ update_cache_hash_metadata, to complete metadata from imdb
+    #   2/ update_cache_imdb_opensubtitles, to search for known hash
+    #   3/ update_cache_imdb_metadata, to complete metadata from imdb
 
     def update_caches_with_paths( self, abs_paths ):
     # Update cache_path with a list of new paths (abs_paths)
@@ -580,33 +580,28 @@ class ListMovies():
     # if hash error, None is stored in cache
 
         cache_path = self.cache_path
-        cache_hash = self.cache_hash
+        cache_imdb = self.cache_imdb
         for path in abs_paths:
 
             if not( cache_path.has_key(path) and \
-                    os.path.getmtime(path) < cache_path[path]['last_update']):
+                    (not os.path.exists(path) or \
+                    os.path.getmtime(path) < cache_path[path]['last_update'])):
 
                 self.log.info("adding new path to cache: %s" % path)
-                cur_hash = hashFile(path)
+                file_hash = hashFile(path)
 
-                if cur_hash in ['SizeError','IOError']: cur_hash = None
+                if file_hash in ['SizeError','IOError']: file_hash = None
                 cache_path[path] = store( self.default_path )
-                cache_path[path].update( {'hash':cur_hash,
-                                   'last_update':time.time() } )
-
-                # setting default keys.values in cache
-                if not cache_hash.has_key(cur_hash):
-                    self.log.debug("adding hash entry %s for file: %s" % ( \
-                            str(cur_hash), path ) )
-
-                    cache_hash[cur_hash] = store( self.default_hash )
-                    cache_hash[cur_hash]['bytesize'] = os.path.getsize(path)
+                cache_path[path].update( {'file_hash':file_hash,
+                                   'last_update':time.time(),
+                                   'bytesize': os.path.getsize(path) \
+                                           if os.path.exists(path) else 0} )
 
         self.save_cache()
 
     def update_caches_with_top( self, num ):
         cache_path = self.cache_path
-        cache_hash = self.cache_hash
+        cache_imdb = self.cache_imdb
 
         try:
             movie_list = self.i.get_top250_movies()[0:num]
@@ -620,69 +615,76 @@ class ListMovies():
 
         for idx, movie in enumerate(movie_list):
             key = idx+1
-            cur_hash = movie.getID()
+            imdb_id = movie.getID()
             if not( cache_path.has_key(key) and \
-                    cache_path[key]['hash'] == cur_hash ):
-                last_hash=None
+                    cache_path[key]['imdb_id'] == imdb_id ):
+                last_imdb_id = None
 
                 self.log.info("adding new top to cache: %s" % key)
 
                 if cache_path.has_key(key):
-                    last_hash = cache_path[key]['hash'];
+                    last_imdb_id = cache_path[key]['imdb_id'];
 
                 cache_path[key] = store( self.default_path )
-                cache_path[key].update( {'hash':cur_hash } )
+                cache_path[key].update( {'imdb_id':imdb_id } )
 
                 # setting default keys.values in cache
-                if not cache_hash.has_key(cur_hash):
+                if not cache_imdb.has_key(imdb_id):
                     self.log.debug("adding hash entry %s for file: %s" % ( \
-                            str(cur_hash), key ) )
+                            str(imdb_id), key ) )
 
-                    cache_hash[cur_hash] = store( self.default_hash )
-                    cache_hash[cur_hash]['t_imdb_id'] = cur_hash
+                    cache_imdb[imdb_id] = store( self.default_imdb )
+                    cache_imdb[imdb_id]['imdb_id'] = imdb_id
 
-                self.__get_metadata(cur_hash)
+                self.__get_metadata(key) 
 
-                if last_hash:
-                    result = self.cache_hash[cur_hash]
-                    last_result = self.cache_hash[last_hash]
+                if last_imdb_id:
+                    result = self.cache_imdb[imdb_id]
+                    last_result = self.cache_imdb[last_imdb_id]
                     print("%d: %s (was %s)" %
                             (key, result['m_title'], last_result['m_title']))
 
         self.save_cache()
 
-    def update_cache_hash_opensubtitles(self):
-    # Update cache_hash opensubtitles info
+    def update_cache_imdb_opensubtitles(self):
+    # Update cache_imdb opensubtitles info
     # For movies which hash was not found in opensubtitles, will be tried
     # again only 6 hours after
 
-        cache = self.cache_hash
-        hashs = [ h for h in cache.keys() if h and
-            not cache[h]['o_title'] and \
-                 cache[h]['o_check'] < time.time()-3600*6 ]
+        cache_path = self.cache_path
+        cache_imdb = self.cache_imdb
+        paths = [ path for path in cache_path.keys() if path and
+                cache_path[path]['file_hash'] and
+                not cache_path[path]['o_title'] and 
+                cache_path[path]['o_check'] < time.time()-3600*6 ]
 
-        data = self.get_info_from_opensubtitles( hashs )
+        file_hashs = [ cache_path[path]['file_hash'] for path in paths ]
+        data = self.get_info_from_opensubtitles( file_hashs )
 
-        for h in hashs:
+        for path in paths :
+            file_hash = cache_path[path]['file_hash'] 
 
             now = time.time()
-            cache[h]['o_check'] = now
+            cache_path[path]['o_check'] = now
 
-            if data.has_key(h):
-                info = data[h]
+            if data.has_key(file_hash):
+                info = data[file_hash]
                 if info:
                     try:
-                        open_info = {'o_imdb_id':info['MovieImdbID'],
+                        imdb_id = info['MovieImdbID']
+                        open_info = {'imdb_id':info['MovieImdbID'],
                                        'o_title':info['MovieName'],
                                         'o_year':info['MovieYear']}
-                        cache[h].update( open_info )
+                        cache_path[path].update( open_info )
+                        cache_imdb[imdb_id] = store( self.default_imdb )
+                        cache_imdb[imdb_id]['imdb_id'] = imdb_id
 
                     except:
                         self.log.debug("faild to update (%s) open info" +\
-                                " with open answer %s " % (str(h),str(info)) )
+                                " with open answer %s " % (path,str(info)) )
                         pass
 
-        if len(hashs)>0:
+        if len(paths)>0:
             self.save_cache()
 
     # *********** OPENSUBTITLES CONNECTIONS **********************************
@@ -730,17 +732,17 @@ class ListMovies():
                         str(e))
 
     # retrive general info for a list of movie hash
-    def get_info_from_opensubtitles( self, hashs ):
+    def get_info_from_opensubtitles( self, file_hashs ):
             data = {}
 
-            if len(hashs)>0:
+            if len(file_hashs)>0:
                 self.log.info("request OpenSubtitle info for %d hashes" %\
-                        len(hashs))
+                        len(file_hashs))
                 try:
                     self.login()
-                    for k in range( len(hashs)/150+1 ):
+                    for k in range( len(file_hashs)/150+1 ):
                         res = self.server.CheckMovieHash( self.token,
-                                hashs[150*k:(150*(k+1))] )
+                                file_hashs[150*k:(150*(k+1))] )
                         data.update( res['data'] )
                     self.logout()
                 except LoginError:
@@ -753,29 +755,7 @@ class ListMovies():
 
             return(data)
 
-    def path_from_hash(self, cur_hash):
-    # Returns the lastest modified file in cache_path pointing to this hash
-    # a path points to 1 hash only
-    # an hash can be pointed by unlimited path
-    # [cache_path] * ----> 1 [cache_hash]
-    # return a dictionary, 'path', 'cache_time', 'file_time'
-
-        path = [ (k,v['last_update']) for k,v in self.cache_path.iteritems() \
-                if v['hash'] == cur_hash and not isinstance(k, (int, long)) \
-                and os.path.exists(k) ]
-
-        if len(path)>0:
-            update_time = [ k[1] for k in path ]
-            max_update_time = max(update_time)
-            path = path[ update_time.index( max_update_time ) ][0]
-            res = {'path':path, 'cache_time':max_update_time,
-                        'file_time':os.path.getmtime(path)}
-        else:
-            res = None
-        return(res)
-
-
-    def update_cache_hash_metadata(self):
+    def update_cache_imdb_metadata(self):
     # Update metadata from IMDB for
     # If movie hash found in opensubtitles:
     # we already know the imdb id -> simple call
@@ -788,97 +768,97 @@ class ListMovies():
     # If movie hash not found in opensubtitle and file modified after
     # our last imdb call -> we call imdb again
 
-        cache = self.cache_hash
-        hashs = []
-        for h,v in cache.iteritems():
+        cache_path = self.cache_path
+        cache_imdb = self.cache_imdb
+        paths = []
+        for path,info in cache_path.iteritems():
+            if info:
+                c_time = info['cache_time']
+                updt_after   = not info['imdb_id'] and info['imdb_check']<c_time
 
-            p_info = self.path_from_hash(h)
-            if p_info:
-                path, c_time = p_info['path'], p_info['cache_time']
-                updt_after   = not v['o_title'] and v['m_last_update']<c_time
-                path_exists  = os.path.exists(path)
+                if not info['imdb_check'] or updt_after:
+                    paths.append(path)
 
-                if path_exists and (not v['m_last_update'] or updt_after):
-                    hashs.append(h)
+        idx, last_len, total = 1, 0, len(paths)
 
-        idx, last_len, total = 1, 0, len(hashs)
-
-        for h in hashs:
-            self.log.info("get metadata for hash: %s" % str(h) )
+        for path in paths:
+            self.log.info("get metadata for path: %s" % path )
             out_str = u"Getting metadata: [%(index)i/%(nb_movies)i] "
             out_str = out_str % {'index':idx,'nb_movies':total}
             if len(out_str) < last_len:
                 sys.stdout.write(' '*last_len+'\r')
             self.flush_out_str(out_str)
 
-            self.__get_metadata(h)
-            cache[h]['imdb_check'] = time.time()
+            self.__get_metadata(path)
+            cache_path[path]['imdb_check'] = time.time()
 
             if idx % 10 == 0:
                 self.save_cache()
             idx += 1
 
-        if len(hashs)>0:
+        if len(paths)>0:
             self.save_cache()
             self.flush_out_str(' '*last_len+'\r')
 
+    def find_imdb_result(self, guess, path):
+        cache_path = self.cache_path
+        cache_imdb = self.cache_imdb
 
-    def __get_metadata(self, cur_hash):
+        results = self.i.search_movie( guess['g_title'] )
+
+        if results:
+            self.log.info("finding best match in answers")
+            best_result, unsure = self.best_match( guess['g_title'],
+                    guess['g_year'], results)
+
+            self.log.debug("best result for %s: %s" % \
+                    (guess['g_title'], best_result.get('title')))
+
+            cache_path[path]['g_unsure'] = unsure
+            self.i.update(best_result)
+            imdb_id = best_result.movieID
+            cache_path[path]['imdb_id'] = imdb_id
+
+            # setting default keys.values in cache
+            self.log.debug("adding hash entry %s for file: %s" % ( \
+                    str(imdb_id), path ) )
+
+            cache_imdb[imdb_id] = store( self.default_imdb )
+            self.__fill_metadata( imdb_id, best_result)
+        else:
+            self.log.info("no result from IMDb, empty metadata")
+            cache_path[path]['g_unsure'] = True
+
+    def __get_metadata(self, path):
     # "Get metadata for files not already in cache
     # @param files: list of filenames (path or basenames)
 
-        cache_hash = self.cache_hash
+        cache_path = self.cache_path
         imdb_id    = None
 
+        #XXX todo meme cache pour top et path, appele name
         try:
+            # if we have an imdb_id for this hash
+            imdb_id = cache_path[path]['imdb_id']
 
-            # if we have an imdb_id from opensubtitles for this hash
-            top_imdb_id = cache_hash[cur_hash]['t_imdb_id']
-            imdb_id = cache_hash[cur_hash]['o_imdb_id']
-
-            if top_imdb_id:
-                self.log.info("IMDb comes from top250 %s" % top_imdb_id)
-                result = self.i.get_movie(top_imdb_id)
-                if result:
-                    self.__fill_metadata( cur_hash, result )
-                else:
-                    self.log.warning("failed to get movie info from IMDB")
-
-            elif imdb_id:
-                self.log.info("IMDb id stored from Opensubtites %s" % imdb_id)
+            if imdb_id:
+                self.log.info("IMDb id already found %s" % imdb_id)
                 result = self.i.get_movie(imdb_id)
                 if result:
-                    self.__fill_metadata( cur_hash, result )
+                    self.__fill_metadata( imdb_id, result )
                 else:
                     self.log.warning("failed to get movie info from IMDB")
 
             else:
                 # we need to guess a title, from a file pointing to this hash
-                self.log.info("no IMDb id stored from OpenSubtitles")
-
-                path  = self.path_from_hash( cur_hash )['path']
-                guess = self.guessed_title_year( path )
-                self.log.debug("info guessed from filaneme %s" % str(guess) )
-
-                cache_hash[cur_hash].update( guess )
-
-                results = self.i.search_movie( guess['g_title'] )
-
-                if results:
-                    self.log.info("finding best match in answers")
-                    best_result, unsure = self.best_match( guess['g_title'],
-                            guess['g_year'], results)
-
-                    self.log.debug("best result for %s: %s" % \
-                            (guess['g_title'], best_result.get('title')))
-
-                    cache_hash[cur_hash]['g_unsure'] = unsure
-                    self.i.update(best_result)
-                    self.__fill_metadata( cur_hash, best_result)
+                self.log.info("no IMDb id stored")
+                if cache_path[path]['bytesize']:
+                    guess = self.guessed_title_year( path )
                 else:
-                    self.log.info("no result from IMDb, empty metadata")
-                    self.__fill_metadata( cur_hash, None )
-                    cache_hash[cur_hash]['g_unsure'] = True
+                    guess = { 'g_title':path.strip(), 'g_year': None }
+                self.log.debug("info guessed from filaneme %s" % str(guess) )
+                cache_path[path].update( guess )
+                self.find_imdb_result(guess, path)
 
         except imdb.IMDbError, e:
             print( "Connection error, current movie: [%s]" % \
@@ -971,23 +951,23 @@ class ListMovies():
             guessed_year = None
 
         return {'g_title':title.strip(), 'g_year':guessed_year}
-
+  
     def get_runtime( self, runtime_list ):
     # Extract the first runtime found from runtime_list
         return runtime_list[0].split('::')[0].split(':')[-1]
 
 
-    def __fill_metadata(self, cur_hash, found):
+    def __fill_metadata(self, imdb_id, found):
     # Fill metadata for one movie
-    # @param cur_hash: current hash to update
+    # @param imdb_id: current hash to update
     # @param found: the imdb movie object selected
 
-        current = self.cache_hash[cur_hash]
+        current = self.cache_imdb[imdb_id]
 
         current['m_last_update'] = time.time()
 
         if found:
-            current['m_id']    = found.movieID
+            current['imdb_id']    = found.movieID
             current['m_title'] = found.get('title')
             current['m_canonical_title']=found.get('smart canonical title')
             current['m_runtime'] = found.get('runtime')
@@ -1006,7 +986,7 @@ class ListMovies():
 
         else:
             current.update({
-                    'm_id':'000000', 'm_title':'___NOTFOUND___',
+                    'imdb_id':'000000', 'm_title':'___NOTFOUND___',
                     'm_canonical_title':'___NOTFOUND___',
                     'm_genre':[],'m_countries':[],
                     'm_director':[], 'm_cast':[], 'm_cover':[],
@@ -1042,15 +1022,16 @@ class ListMovies():
             if not boolean_input('Try again for this movie?'):
                 return(False)
 
-        cur_hash = self.cache_path[f]['hash']
+        imdb = self.cache_path[f]['imdb_id']
+        # TODO if imdb vaut None
 
         try:
 
-            if self.cache_hash[cur_hash]['m_id'] != '000000':
+            if self.cache_imdb[imdb]['imdb_id'] != '000000':
                 self.pretty_print(f)
                 confirm = boolean_input("Do you confirm stored info?")
                 if confirm:
-                    self.cache_hash[cur_hash]['g_unsure']=False
+                    self.cache_path[f]['g_unsure'] = False
                     return( True )
 
             input_id = boolean_input("Will you provide an IMDb id?")
@@ -1069,10 +1050,11 @@ class ListMovies():
                 print( '--> movie found  year: %s' % result['year'] )
                 agree = boolean_input('Confirm this result?')
                 if agree:
-                    self.__fill_metadata(cur_hash, result)
-                    self.cache_hash[cur_hash].update(\
+                    self.__fill_metadata(imdb, result)
+                    self.cache_imdb[imdb].update(\
                         { 'g_title':result['title'],
-                          'g_year':result['year'], 'g_unsure':False })
+                          'g_year':result['year'] })
+                    self.cache_path[f]['g_unsure'] = False
                     self.save_cache()
                     print("movie saved")
                     return( True )
@@ -1095,22 +1077,25 @@ class ListMovies():
     # @param files: a list of absolute path
 
         files = [ f for f in files if \
-                    not self.cache_hash[
-                        self.cache_path[f]['hash']]['o_imdb_id']]
+                    not self.cache_imdb[
+                        self.cache_path[f]['hash']]['imdb_id']]
+                    # TODO
         if len(files)>0:
 
             to_upload = []
             for f in files:
 
-                cur_hash = self.cache_path[f]['hash']
-                imdb_id  = self.cache_hash[cur_hash]['m_id']
-                bytesize = str(self.cache_hash[cur_hash]['bytesize'])
+                file_hash = self.cache_path[f]['file_hash']
+                if not file_hash:
+                    continue
+                imdb_id  = self.cache_path[f]['imdb_id']
+                bytesize = str(self.cache_path[f]['bytesize'])
 
                 self.pretty_print(f)
                 msg = "Do you want to send hash info to opensubtitles?"
                 insert = boolean_input(msg)
                 if insert:
-                    to_upload.append( { 'moviehash':cur_hash,
+                    to_upload.append( { 'moviehash':file_hash,
                                     'moviebytesize':bytesize,
                                            'imdbid':imdb_id } )
 
@@ -1123,7 +1108,7 @@ class ListMovies():
 
                     for v in to_upload:
                         h = v['moviehash']
-                        self.cache_hash[h]['o_check'] = None
+                        self.cache_imdb[h]['o_check'] = None
 
                     self.save_cache()
 
@@ -1184,15 +1169,15 @@ class ListMovies():
             old_subs = [ old for old in filelist(filedir,False) \
                     if re.search(pattern, old) ]
 
-            h           = self.cache_path[f]['hash']
-            osbtls      = self.cache_hash[h]['o_imdb_id'] != None
-            imdb_id     = self.cache_hash[h]['m_id']
-            byte_size   = self.cache_hash[h]['bytesize']
+            h           = self.cache_path[f]['file_hash']
+            osbtls      = self.cache_path[f]['imdb_id'] != None
+            imdb_id     = self.cache_imdb[f]['imdb_id']
+            byte_size   = self.cache_path[f]['bytesize']
             fn          = os.path.basename(f)
 
             if imdb_id and len(old_subs)==0:
                 ref[f] = {'osbtls':osbtls, 'imdb_id':imdb_id,
-                          'file':fn, 'hash':h }
+                          'file':fn, 'file_hash':h }
                 if osbtls:
                     query.append({ 'sublanguageid':lang,
                                        'moviehash':str(h),
@@ -1213,7 +1198,7 @@ class ListMovies():
 
         for k, v in ref.iteritems():
 
-            keep = [ s for s in subs if s['MovieHash']==v['hash'] ]
+            keep = [ s for s in subs if s['MovieHash']==v['file_hash'] ]
             if len(keep)==0:
                 keep = [ s for s in subs if s['IDMovieImdb']==
                         str(int(v['imdb_id'])) ]
@@ -1388,19 +1373,18 @@ class ListMovies():
                     if filter_type == 'runtime':
                         files = [ f for f in files if \
                                 sign*keys <= sign*float(\
-                                self.get_runtime(self.cache_hash[\
-                                self.cache_path[f]['hash']][field])) ]
+                                self.get_runtime(self.cache_imdb[\
+                                self.cache_path[f]['imdb_id']][field])) ]
                     else:
                         files = [ f for f in files if \
-                                sign*keys <= sign*float(self.cache_hash[\
-                                self.cache_path[f]['hash']][field]) ]
+                                sign*keys <= sign*float(self.cache_imdb[\
+                                self.cache_path[f]['imdb_id']][field]) ]
 
 
                 elif filter_type == 'unsure':
                     self.log.info("filtering unsure movies")
                     files = [ f for f in files if \
-                        self.cache_hash[\
-                            self.cache_path[f]['hash']]['g_unsure'] ]
+                        self.cache_path[f]['g_unsure'] ]
 
                 else:
                     self.log.info("filtering type: %s" %filter_type )
@@ -1409,7 +1393,7 @@ class ListMovies():
                     filter_type = 'm_' + filter_type
                     files = filter( lambda m:\
                         set([key.lower() for
-                        key in self.hash_from_path(m)[filter_type]]).\
+                        key in self.imdb_from_path(m)[filter_type]]).\
                                 intersection(keys), files)
         except FilterParsingError:
             self.log.error("Invalid filter ! Please read README for syntax")
@@ -1431,17 +1415,21 @@ class ListMovies():
         else:
             keyword = 'm_rating'
 
-        files.sort( key=lambda f: self.hash_from_path(f)[keyword],\
+        files.sort( key=lambda f: self.imdb_from_path(f)[keyword],\
                 reverse=self.order_reverse)
 
         return(files)
 
-    def hash_from_path(self,path):
+    def imdb_from_path(self,path):
         try:
-            cur_hash    = self.cache_path[path]['hash']
-            result      = self.cache_hash[cur_hash]
+            imdb_id = self.cache_path[path]['imdb_id']
+            if not imdb_id:
+                self.log.error("this path %s was not found on imdb" % path )
+                result  = store()
+            else:
+                result  = self.cache_imdb[imdb_id]
         except:
-            self.log.error("this path doesnt belong to cash_path %s" % path )
+            self.log.error("this path doesn't belong to cash_path %s" % path )
             result      = store()
 
         return( result )
@@ -1455,26 +1443,27 @@ class ListMovies():
     def pretty_print(self, filename):
     # Print movie with metadata and colors according to arguments
 
-        h = self.hash_from_path(filename)
-        if not h['m_id']:
+        imdb = self.imdb_from_path(filename)
+        info = self.cache_path[filename]
+        if not imdb['imdb_id']:
             return(0)
 
         values_dict = {'b':self.BLUE,
                        'e':self.END,
                        'header':self.RED + '/!\\ ' + self.END if \
-                               h['g_unsure'] else '',
-                       'title':(self.MAGEN if h['o_imdb_id'] \
-                               else self.YELLOW)+to_ascii(h['m_title'])+\
+                               self.cache_path[filename]['g_unsure'] else '',
+                       'title':(self.MAGEN if imdb['imdb_id'] \
+                               else self.YELLOW)+to_ascii(imdb['m_title'])+\
                                self.END,
-                       'rating':str(h['m_rating']),
-                       'runtime':self.get_runtime(h['m_runtime']),
-                       'year':h['m_year'],
-                       'genre':"%s" % ', '.join(h['m_genre']),
+                       'rating':str(imdb['m_rating']),
+                       'runtime':self.get_runtime(imdb['m_runtime']),
+                       'year':imdb['m_year'],
+                       'genre':"%s" % ', '.join(imdb['m_genre']),
                        'filename':os.path.basename(filename) if \
-                               not isinstance(filename , (int, long)) else filename,
-                       'director':', '.join(h['m_director']),
-                       'size': str(int(h['bytesize'] / (1024*1024))) \
-                               if h['bytesize'] else None
+                               os.path.exists(filename) else filename,
+                       'director':', '.join(imdb['m_director']),
+                       'size': str(int(info['bytesize'] / (1024*1024))) \
+                               if info['bytesize'] else None
                       }
 
         if self.disp_very_long:
@@ -1489,14 +1478,14 @@ class ListMovies():
             len_cast_header = len(cast_header) - len(self.BLUE) - len(self.END)
             out_str+=cast_header
             first = True
-            for actor in h['m_cast']:
+            for actor in imdb['m_cast']:
                 if first:
                     first = False
                     out_str += actor+'\n'
                 else:
                     out_str+=len_cast_header*u' '+actor+'\n'
             out_str += "\n" + self.BLUE + "summary"+self.END+": %s\n---\n" % \
-                    h['m_summary']
+                    imdb['m_summary']
         elif self.disp_long:
             out_str = u"%(header)s%(title)s (%(year)s, %(rating)s, %(runtime)smin) "
             out_str += "[%(b)s%(genre)s%(e)s] from %(director)s: "
@@ -1505,9 +1494,9 @@ class ListMovies():
         else:
             out_str = u"%(header)s%(title)s (%(year)s) - %(runtime)smin -> %(filename)s\n" % values_dict
         sys.stdout.write(out_str.encode('utf-8'))
-        if self.disp_outline and h['m_short_summary']:
+        if self.disp_outline and imdb['m_short_summary']:
             sys.stdout.write(unicode( \
-                    '*** ' + h['m_short_summary']+'\n').encode('utf-8'))
+                    '*** ' + imdb['m_short_summary']+'\n').encode('utf-8'))
 
     def html_build(self, files):
     # Show the list of files, using metadata according to arguments
@@ -1524,20 +1513,19 @@ class ListMovies():
             out_file.write("<table>\n")
             count = 0
             for f in files:
+                info = self.cache_path[f]
                 if count % 5 == 0:
                     if count > 0: out_file.write("</tr>")
                     out_file.write("<tr height=200>")
 
-                h = self.hash_from_path(f)
-                if h['m_id']:
+                h = self.imdb_from_path(f)
+                if h['imdb_id']:
                     values_dict = {
-                        'imdb' :'http://www.imdb.com/title/tt'+h['m_id'],
+                        'imdb' :'http://www.imdb.com/title/tt'+h['imdb_id'],
                         'file' : os.path.basename(f)[0:20] if \
-                                not isinstance(f, (int, long)) else '',
-                        'size' : round(h['bytesize']/(1024*1024),1) if \
-                                not isinstance(f, (int, long)) \
-                                and os.path.exists(f) \
-                                else 0,
+                                os.path.exists(f) else '',
+                        'size' : round(info['bytesize']/(1024*1024),1) \
+                                if os.path.exists(f) else 0,
                         'title': h['m_title'],
                         'color': '#FF3333' if h['g_unsure'] else '#808080',
                         'rating' : str(h['m_rating']) or 'None',
@@ -1561,9 +1549,9 @@ class ListMovies():
 
     def imdb_show(self, files):
         for f in files:
-            h = self.hash_from_path(f)
-            if h['m_id']:
-                webbrowser.open_new_tab(imdb.imdbURL_movie_main % h['m_id'])
+            imdb = self.imdb_from_path(f)
+            if imdb['imdb_id']:
+                webbrowser.open_new_tab(imdb.imdbURL_movie_main % imdb['imdb_id'])
 
 if __name__ == "__main__":
 
@@ -1614,9 +1602,9 @@ if __name__ == "__main__":
         LM.update_caches_with_top( 250 )
     else:
         LM.update_caches_with_paths( files )
-        LM.update_cache_hash_opensubtitles()
+        LM.update_cache_imdb_opensubtitles()
 
-    LM.update_cache_hash_metadata()
+    LM.update_cache_imdb_metadata()
     files = LM.filter_and_sort_files(files)
 
     if options.confirm:
