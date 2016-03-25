@@ -255,7 +255,6 @@ def parse_arguments():
         if options.confirm:
             logger.error("You have to specify give files when using --confirm")
             exit(2)
-        args=[u'.']
 
     return( (options, args) )
 
@@ -1597,12 +1596,18 @@ if __name__ == "__main__":
         sys.exit()
 
     if options.top:
-        files = [ "top" + str(i) for i in xrange(250, 0, -1) ]
+        if not len(args):
+            top_size = 250
+        else:
+            top_size = int(args[0])
+        files = [ "top" + str(i) for i in xrange(top_size, 0, -1) ]
     elif options.movielist:
             with open(args[0]) as f:
                 files = [ s.strip().replace('\n', '') for s in f.readlines() ]
                 files = filter(lambda x: len(x) and x[0] != "#", files)
     else:
+        if not args:
+            args=[u'.']
         files = LM.get_files(args)
 
     if options.delete_cache:
@@ -1610,7 +1615,7 @@ if __name__ == "__main__":
         sys.exit()
 
     if options.top:
-        LM.update_caches_with_top( 250 )
+        LM.update_caches_with_top( top_size )
     elif options.movielist:
         LM.update_caches_with_paths( files )
     else:
