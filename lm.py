@@ -618,7 +618,7 @@ class ListMovies():
             return
 
         for idx, movie in enumerate(movie_list):
-            key = "top" + str(idx+1)
+            key = "top" + str(idx+1).zfill(3)
             imdb_id = movie.getID()
             if not( cache_path.has_key(key) and \
                     cache_path[key]['imdb_id'] == imdb_id ):
@@ -1600,7 +1600,7 @@ if __name__ == "__main__":
             top_size = 250
         else:
             top_size = int(args[0])
-        files = [ "top" + str(i) for i in xrange(top_size, 0, -1) ]
+        files = [ "top" + str(i).zfill(3) for i in xrange(top_size, 0, -1) ]
     elif options.movielist:
             with open(args[0]) as f:
                 files = [ s.strip().replace('\n', '') for s in f.readlines() ]
