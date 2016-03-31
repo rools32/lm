@@ -838,6 +838,7 @@ class ListMovies():
     # @param files: list of filenames (path or basenames)
 
         cache_path = self.cache_path
+        cache_imdb= self.cache_imdb
         imdb_id    = None
 
         #XXX todo meme cache pour top et path, appele name
@@ -847,11 +848,14 @@ class ListMovies():
 
             if imdb_id:
                 self.log.info("IMDb id already found %s" % imdb_id)
-                result = self.i.get_movie(imdb_id)
-                if result:
-                    self.__fill_metadata( imdb_id, result )
+                if cache_imdb[imdb_id]['m_title']:
+                    self.log.info("IMDb info already present %s" % imdb_id)
                 else:
-                    self.log.warning("failed to get movie info from IMDB")
+                    result = self.i.get_movie(imdb_id)
+                    if result:
+                        self.__fill_metadata( imdb_id, result )
+                    else:
+                        self.log.warning("failed to get movie info from IMDB")
 
             else:
                 # we need to guess a title, from a file pointing to this hash
