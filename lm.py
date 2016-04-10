@@ -863,7 +863,11 @@ class ListMovies():
                 if cache_path[path]['bytesize']:
                     guess = self.guessed_title_year( path )
                 else:
-                    guess = { 'g_title':path.strip(), 'g_year': None }
+                    parts = re.search("(.+) \(([0-9]{4})\)", path.strip())
+                    if parts:
+                        guess = { 'g_title':parts.group(1), 'g_year': int(parts.group(2)) }
+                    else:
+                        guess = { 'g_title':path.strip(), 'g_year': None }
                 self.log.debug("info guessed from filaneme %s" % str(guess) )
                 cache_path[path].update( guess )
                 self.find_imdb_result(guess, path)
