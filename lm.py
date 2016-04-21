@@ -449,6 +449,7 @@ class ListMovies():
             'm_runtime'           : 0,
             'm_rating'            : None,
             'm_year'              : None,
+            'm_kind'              : None,
             'm_genre'             : None,
             'm_countries'         : None,
             'm_director'          : None,
@@ -907,7 +908,8 @@ class ListMovies():
         _guessed_year  = guess_year
 
         if manual:
-            shown_list = [ str(i+1) + ": " + r['long imdb canonical title'] \
+            shown_list = [ str(i+1) + ": " + r['long imdb canonical title'] + \
+                    "(" + r['kind'] + ")" \
                     for i,r in enumerate(results) ]
             print "\n".join(shown_list)
             movie_idx = int(raw_input('please enter movie idx:'))
@@ -1012,6 +1014,7 @@ class ListMovies():
             current['m_runtime'] = found.get('runtime')
             current['m_rating'] = found.get('rating')
             current['m_year']   = found.get('year')
+            current['m_kind']   = found.get('kind')
             current['m_genre']  = found.get('genre') or []
             current['m_countries'] = found.get('countries') or []
             current['m_director'] = [director.get('name') for director in
@@ -1030,7 +1033,8 @@ class ListMovies():
                     'm_genre':[],'m_countries':[],
                     'm_director':[], 'm_cast':[], 'm_cover':[],
                     'm_votes':0, 'm_summary':'.'*20,'m_rating':0,
-                    'm_runtime':[0],'m_year':1900,'m_short_summary':'.'*20})
+                    'm_runtime':[0],'m_year':1900,'m_kind':'',
+                    'm_short_summary':'.'*20})
 
 
     # ********** MANUAL CONFIRMATION *****************************************
@@ -1498,6 +1502,7 @@ class ListMovies():
                        'rating':str(imdbinfo['m_rating']),
                        'runtime':self.get_runtime(imdbinfo['m_runtime']),
                        'year':imdbinfo['m_year'],
+                       'kind':imdbinfo['m_kind'],
                        'genre':"%s" % ', '.join(imdbinfo['m_genre']),
                        'filename':os.path.basename(filename) if \
                                os.path.exists(filename) else filename,
@@ -1507,7 +1512,7 @@ class ListMovies():
                       }
 
         if self.disp_very_long:
-            out_str  =u"%(header)s%(title)s (%(b)srating%(e)s: %(rating)s)\n%"
+            out_str  =u"%(header)s%(title)s (%(b)srating%(e)s: %(rating)s, %(kind)s)\n%"
             out_str +="(b)syear%(e)s: %(year)s %(b)sgenre%(e)s: %(genre)s\n%"
             out_str +="(b)sruntime%(e)s: %(runtime)s min\n%"
             out_str +="(b)sfile%(e)s: %(filename)s %(b)ssize%(e)s: %(size)sMo"
@@ -1527,7 +1532,7 @@ class ListMovies():
             out_str += "\n" + self.BLUE + "summary"+self.END+": %s\n---\n" % \
                     imdbinfo['m_summary']
         elif self.disp_long:
-            out_str = u"%(header)s%(title)s (%(year)s, %(rating)s, %(runtime)smin) "
+            out_str = u"%(header)s%(title)s (%(year)s, %(rating)s, %(runtime)smin, %(kind)s) "
             out_str += "[%(b)s%(genre)s%(e)s] from %(director)s: "
             out_str += "%(filename)s\n"
             out_str = out_str % values_dict
