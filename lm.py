@@ -1061,12 +1061,12 @@ class ListMovies():
             if not boolean_input('Try again for this movie?'):
                 return(False)
 
-        imdb = self.cache_path[f]['imdb_id']
+        imdbid = self.cache_path[f]['imdb_id']
         # TODO if imdb vaut None
 
         try:
 
-            if self.cache_imdb[imdb]['imdb_id'] != '000000':
+            if self.cache_imdb[imdbid]['imdb_id'] != '000000':
                 self.pretty_print(f)
                 confirm = boolean_input("Do you confirm stored info?")
                 if confirm:
@@ -1090,8 +1090,8 @@ class ListMovies():
                 print( '--> movie found  year: %s' % result['year'] )
                 agree = boolean_input('Confirm this result?', 'y')
                 if agree:
-                    self.__fill_metadata(imdb, result)
-                    self.cache_imdb[imdb].update(\
+                    self.__fill_metadata(imdbid, result)
+                    self.cache_imdb[imdbid].update(\
                         { 'm_title':result['title'],
                           'm_year':result['year'] })
                     self.cache_path[f]['g_unsure'] = False
@@ -1483,25 +1483,25 @@ class ListMovies():
     def pretty_print(self, filename):
     # Print movie with metadata and colors according to arguments
 
-        imdb = self.imdb_from_path(filename)
+        imdbinfo = self.imdb_from_path(filename)
         info = self.cache_path[filename]
-        if not imdb['imdb_id']:
+        if not imdbinfo['imdb_id']:
             return(0)
 
         values_dict = {'b':self.BLUE,
                        'e':self.END,
                        'header':self.RED + '/!\\ ' + self.END if \
                                self.cache_path[filename]['g_unsure'] else '',
-                       'title':(self.MAGEN if imdb['imdb_id'] \
-                               else self.YELLOW)+to_ascii(imdb['m_title'])+\
+                       'title':(self.MAGEN if imdbinfo['imdb_id'] \
+                               else self.YELLOW)+to_ascii(imdbinfo['m_title'])+\
                                self.END,
-                       'rating':str(imdb['m_rating']),
-                       'runtime':self.get_runtime(imdb['m_runtime']),
-                       'year':imdb['m_year'],
-                       'genre':"%s" % ', '.join(imdb['m_genre']),
+                       'rating':str(imdbinfo['m_rating']),
+                       'runtime':self.get_runtime(imdbinfo['m_runtime']),
+                       'year':imdbinfo['m_year'],
+                       'genre':"%s" % ', '.join(imdbinfo['m_genre']),
                        'filename':os.path.basename(filename) if \
                                os.path.exists(filename) else filename,
-                       'director':', '.join(imdb['m_director']),
+                       'director':', '.join(imdbinfo['m_director']),
                        'size': str(int(info['bytesize'] / (1024*1024))) \
                                if info['bytesize'] else None
                       }
@@ -1518,14 +1518,14 @@ class ListMovies():
             len_cast_header = len(cast_header) - len(self.BLUE) - len(self.END)
             out_str+=cast_header
             first = True
-            for actor in imdb['m_cast']:
+            for actor in imdbinfo['m_cast']:
                 if first:
                     first = False
                     out_str += actor+'\n'
                 else:
                     out_str+=len_cast_header*u' '+actor+'\n'
             out_str += "\n" + self.BLUE + "summary"+self.END+": %s\n---\n" % \
-                    imdb['m_summary']
+                    imdbinfo['m_summary']
         elif self.disp_long:
             out_str = u"%(header)s%(title)s (%(year)s, %(rating)s, %(runtime)smin) "
             out_str += "[%(b)s%(genre)s%(e)s] from %(director)s: "
@@ -1534,9 +1534,9 @@ class ListMovies():
         else:
             out_str = u"%(header)s%(title)s (%(year)s) - %(runtime)smin -> %(filename)s\n" % values_dict
         sys.stdout.write(out_str.encode('utf-8'))
-        if self.disp_outline and imdb['m_short_summary']:
+        if self.disp_outline and imdbinfo['m_short_summary']:
             sys.stdout.write(unicode( \
-                    '*** ' + imdb['m_short_summary']+'\n').encode('utf-8'))
+                    '*** ' + imdbinfo['m_short_summary']+'\n').encode('utf-8'))
 
     def html_build(self, files):
     # Show the list of files, using metadata according to arguments
@@ -1589,9 +1589,9 @@ class ListMovies():
 
     def imdb_show(self, files):
         for f in files:
-            imdb = self.imdb_from_path(f)
-            if imdb['imdb_id']:
-                webbrowser.open_new_tab(imdb.imdbURL_movie_main % imdb['imdb_id'])
+            imdbinfo = self.imdb_from_path(f)
+            if imdbinfo['imdb_id']:
+                webbrowser.open_new_tab(imdb.imdbURL_movie_main % imdbinfo['imdb_id'])
 
 if __name__ == "__main__":
 
