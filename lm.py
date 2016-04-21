@@ -34,6 +34,7 @@ import locale
 import logging
 import cPickle
 import argparse
+import readline
 import xmlrpclib
 from difflib import SequenceMatcher
 from unicodedata import normalize
@@ -157,11 +158,21 @@ def to_ascii( string ):
     return normalize( 'NFKD', string ).encode('ascii', 'ignore')
 
 # boolean yes / no raw_input
-def boolean_input(msg):
+def boolean_input(msg, default='n'):
     res = None
-    while res not in ['y','n']:
-        res = raw_input( msg + ' (y/n):').lower()
+    while res not in ['y','n', '']:
+        res = raw_input( msg + ' (y/n [%s]):' % default).lower()
+    if res == '':
+        res = default
     return( res=='y')
+
+# prefilled raw_input
+def prefilled_raw_input(prompt, prefill):
+    readline.set_startup_hook(lambda: readline.insert_text(prefill))
+    try:
+        return raw_input(prompt)
+    finally:
+        readline.set_startup_hook()
 
 # ********** ARGUMENTS HANDLER ***********************************************
 def parse_arguments():
@@ -814,9 +825,14 @@ class ListMovies():
             self.log.info("finding best match in answers")
             best_result, unsure = self.best_match( guess['g_title'],
                     guess['g_year'], results)
-
             self.log.debug("best result for %s: %s" % \
                     (guess['g_title'], best_result.get('title')))
+
+            if unsure:
+                print "movie found: " + best_result['long imdb canonical title'] + \
+                        "(" + best_result['kind'] + ")"
+                if self.__manual_confirm(path, True):
+                    return
 
             cache_path[path]['g_unsure'] = unsure
             self.i.update(best_result)
@@ -881,7 +897,7 @@ class ListMovies():
 
 
     # ********** UNKNOW HASH MATCHER *****************************************
-    def best_match(self, guess_title, guess_year, results=None):
+    def best_match(self, guess_title, guess_year, results=None, manual=False):
         # Check match between the found movie and original filename
 
         if not results:
@@ -890,34 +906,43 @@ class ListMovies():
         _guessed_title = alphanum( guess_title ).lower()
         _guessed_year  = guess_year
 
-        _results = [ r for r in results if isinstance(r,imdb.Movie.Movie) ]
-        if _guessed_year:
-            _results = [ r for r in _results if r.has_key('year') \
-                                        and r['year'] == _guessed_year ]
+        if manual:
+            shown_list = [ str(i+1) + ": " + r['long imdb canonical title'] \
+                    for i,r in enumerate(results) ]
+            print "\n".join(shown_list)
+            movie_idx = int(raw_input('please enter movie idx:'))
+            _best_result = results[movie_idx-1]
+            unsure = False
 
-        _best_ratio  = 0
-        _best_result = None
+        else:
+            _results = [ r for r in results if isinstance(r,imdb.Movie.Movie) ]
+            if _guessed_year:
+                _results = [ r for r in _results if r.has_key('year') \
+                                            and r['year'] == _guessed_year ]
 
-        for r in _results:
+            _best_ratio  = 0
+            _best_result = None
 
-            _list_titles  = [ alphanum(title.split('::')[0]).lower() \
-                                    for title in (r.get('akas') or [])]
-            _list_titles += [ alphanum(r.get('title')).lower() ]
+            for r in _results:
 
-            for other_title in _list_titles:
-                cur_ratio = SequenceMatcher(None,
-                            other_title,_guessed_title).ratio()
+                _list_titles  = [ alphanum(title.split('::')[0]).lower() \
+                                        for title in (r.get('akas') or [])]
+                _list_titles += [ alphanum(r.get('title')).lower() ]
 
-                if cur_ratio > _best_ratio:
-                    _best_ratio, _best_result = cur_ratio, r
-                    self.log.info("ratio ==> %s (for [%s]) %f" % \
-                                    ( other_title, _guessed_title, cur_ratio))
+                for other_title in _list_titles:
+                    cur_ratio = SequenceMatcher(None,
+                                other_title,_guessed_title).ratio()
 
-        unsure = _best_ratio < 0.7
+                    if cur_ratio > _best_ratio:
+                        _best_ratio, _best_result = cur_ratio, r
+                        self.log.info("ratio ==> %s (for [%s]) %f" % \
+                                        ( other_title, _guessed_title, cur_ratio))
 
-        if _best_ratio < 0.7 and _guessed_year:
-            self.log.info( "ratio <0.7 & year, we retry on base results")
-            _best_result, unsure = self.best_match(guess_title,None,results)
+            unsure = _best_ratio < 0.7
+
+            if _best_ratio < 0.7 and _guessed_year:
+                self.log.info( "ratio <0.7 & year, we retry on base results")
+                _best_result, unsure = self.best_match(guess_title,None,results)
 
         return _best_result, unsure
 
@@ -1048,21 +1073,22 @@ class ListMovies():
                     self.cache_path[f]['g_unsure'] = False
                     return( True )
 
-            input_id = boolean_input("Will you provide an IMDb id?")
+            input_id = boolean_input("Will you provide an IMDb id? ")
             if input_id:
-                imdb_id =raw_input('please enter the IMDb id for this movie:')
+                imdb_id =raw_input('please enter the IMDb id for this movie: ')
                 result = self.i.get_movie(imdb_id)
             else:
-                title =raw_input('please enter movie title:')
-                year  =raw_input('please enter year, leave blank if unknown:')
+                readline.set_startup_hook(lambda: readline.insert_text(f))
+                title = prefilled_raw_input('please enter movie title: ', f)
+                year = raw_input('please enter year, leave blank if unknown: ')
                 if year=='':
                     year = None
-                result, unsure = self.best_match( title, year )
+                result, unsure = self.best_match( title, year, manual=True )
 
             if result:
                 print( '--> movie found title: %s' % result['title'] )
                 print( '--> movie found  year: %s' % result['year'] )
-                agree = boolean_input('Confirm this result?')
+                agree = boolean_input('Confirm this result?', 'y')
                 if agree:
                     self.__fill_metadata(imdb, result)
                     self.cache_imdb[imdb].update(\
