@@ -1065,12 +1065,10 @@ class ListMovies():
             if not boolean_input('Try again for this movie?'):
                 return(False)
 
-        imdbid = self.cache_path[f]['imdb_id']
-        # TODO if imdb vaut None
-
         try:
 
-            if self.cache_imdb[imdbid]['imdb_id'] != '000000':
+            last_imdb_id = self.cache_path[f]['imdb_id']
+            if self.cache_imdb[last_imdb_id]['imdb_id'] != '000000':
                 self.pretty_print(f)
                 confirm = boolean_input("Do you confirm stored info?")
                 if confirm:
@@ -1079,7 +1077,7 @@ class ListMovies():
 
             input_id = boolean_input("Will you provide an IMDb id? ")
             if input_id:
-                imdb_id =raw_input('please enter the IMDb id for this movie: ')
+                imdb_id = raw_input('please enter the IMDb id for this movie: ')
                 result = self.i.get_movie(imdb_id)
             else:
                 readline.set_startup_hook(lambda: readline.insert_text(f))
@@ -1088,19 +1086,19 @@ class ListMovies():
                 if year=='':
                     year = None
                 result, unsure = self.best_match( title, year, manual=True )
+                imdb_id = result.getID()
 
             if result:
+                self.cache_imdb[imdb_id] = store( self.default_imdb )
                 print( '--> movie found title: %s' % result['title'] )
                 print( '--> movie found  year: %s' % result['year'] )
                 agree = boolean_input('Confirm this result?', 'y')
                 if agree:
-                    self.__fill_metadata(imdbid, result)
-                    self.cache_imdb[imdbid].update(\
-                        { 'm_title':result['title'],
-                          'm_year':result['year'] })
+                    self.i.update(result)
+                    self.__fill_metadata(imdb_id, result)
                     self.cache_path[f]['g_unsure'] = False
+                    self.cache_path[f]['imdb_id'] = imdb_id
                     self.save_cache()
-                    print("movie saved")
                     return( True )
                 else:
                     return( self.__manual_confirm( f, ask=True ) )
